@@ -1,0 +1,22 @@
+@api = http://localhost:5080
+
+### Look up a booking
+GET {{api}}/api/bookings/QX7P2L
+
+### Find bookings by last name
+GET {{api}}/api/bookings?lastName=Tan
+
+### List change requests
+GET {{api}}/api/change-requests
+
+### Create a change request
+POST {{api}}/api/change-requests
+Content-Type: application/json
+
+{
+  "bookingReference": "QX7P2L",
+  "currentDate": "2026-11-20",
+  "requestedDate": "2026-11-22",
+  "note": "Prefer a morning flight",
+  "createdAt": "2026-10-29T09:00:00+00:00"
+}

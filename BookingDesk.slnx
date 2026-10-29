@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/BookingDesk.Api/BookingDesk.Api.csproj" />
     <Project Path="src/BookingDesk.Core/BookingDesk.Core.csproj" />
     <Project Path="src/BookingDesk.McpServer/BookingDesk.McpServer.csproj" />
   </Folder>

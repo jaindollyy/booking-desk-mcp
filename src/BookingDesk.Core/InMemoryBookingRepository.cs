@@ -1,19 +1,31 @@
 namespace BookingDesk.Core;
 
+/// <summary>
+/// Where bookings and change requests are stored. The MCP server uses either the in-memory version
+/// (for a self-contained demo) or <see cref="HttpBookingRepository"/>, which calls the Booking API.
+/// </summary>
 public interface IBookingRepository
 {
-    Booking? FindByReference(string reference);
+    Task<Booking?> FindByReferenceAsync(string reference, CancellationToken cancellationToken = default);
 
-    IReadOnlyList<Booking> FindByLastName(string lastName);
+    Task<IReadOnlyList<Booking>> FindByLastNameAsync(string lastName, CancellationToken cancellationToken = default);
 
-    IReadOnlyList<ChangeRequest> GetChangeRequests(string? bookingReference = null);
+    Task<IReadOnlyList<ChangeRequest>> GetChangeRequestsAsync(string? bookingReference = null, CancellationToken cancellationToken = default);
 
-    ChangeRequest AddChangeRequest(string bookingReference, DateOnly currentDate, DateOnly requestedDate, string? note, DateTimeOffset createdAt);
+    Task<ChangeRequest> AddChangeRequestAsync(NewChangeRequest request, CancellationToken cancellationToken = default);
 }
 
+/// <summary>The data needed to create a change request.</summary>
+public sealed record NewChangeRequest(
+    string BookingReference,
+    DateOnly CurrentDate,
+    DateOnly RequestedDate,
+    string? Note,
+    DateTimeOffset CreatedAt);
+
 /// <summary>
-/// Thread-safe in-memory storage with fictional sample data. Swap it for a database-backed
-/// implementation of <see cref="IBookingRepository"/> in a real system.
+/// Thread-safe in-memory storage with fictional sample data. The Booking API uses it as its data store,
+/// and the MCP server can use it directly when no API is configured.
 /// </summary>
 public sealed class InMemoryBookingRepository : IBookingRepository
 {
@@ -36,49 +48,53 @@ public sealed class InMemoryBookingRepository : IBookingRepository
         new("RV6J1S", "Lena", "Novak", "ADL", "MEL", today.AddDays(-10), "Economy", BookingStatus.Flown),
     ]);
 
-    public Booking? FindByReference(string reference)
+    public Task<Booking?> FindByReferenceAsync(string reference, CancellationToken cancellationToken = default)
     {
         lock (_gate)
-            return _bookings.GetValueOrDefault(reference);
+            return Task.FromResult(_bookings.GetValueOrDefault(reference));
     }
 
-    public IReadOnlyList<Booking> FindByLastName(string lastName)
+    public Task<IReadOnlyList<Booking>> FindByLastNameAsync(string lastName, CancellationToken cancellationToken = default)
     {
         lock (_gate)
         {
-            return _bookings.Values
+            IReadOnlyList<Booking> matches = _bookings.Values
                 .Where(b => string.Equals(b.PassengerLastName, lastName, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(b => b.TravelDate)
                 .ToList();
+            return Task.FromResult(matches);
         }
     }
 
-    public IReadOnlyList<ChangeRequest> GetChangeRequests(string? bookingReference = null)
+    public Task<IReadOnlyList<ChangeRequest>> GetChangeRequestsAsync(string? bookingReference = null, CancellationToken cancellationToken = default)
     {
         lock (_gate)
         {
-            return _changeRequests
+            IReadOnlyList<ChangeRequest> matches = _changeRequests
                 .Where(r => bookingReference is null
                     || string.Equals(r.BookingReference, bookingReference, StringComparison.OrdinalIgnoreCase))
                 .ToList();
+            return Task.FromResult(matches);
         }
     }
 
-    public ChangeRequest AddChangeRequest(string bookingReference, DateOnly currentDate, DateOnly requestedDate, string? note, DateTimeOffset createdAt)
+    public Task<ChangeRequest> AddChangeRequestAsync(NewChangeRequest request, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         lock (_gate)
         {
-            var request = new ChangeRequest(
+            var created = new ChangeRequest(
                 $"CR-{_changeRequests.Count + 1:D4}",
-                bookingReference,
-                currentDate,
-                requestedDate,
-                note,
-                createdAt,
+                request.BookingReference.ToUpperInvariant(),
+                request.CurrentDate,
+                request.RequestedDate,
+                request.Note,
+                request.CreatedAt,
                 ChangeRequestStatus.PendingReview);
 
-            _changeRequests.Add(request);
-            return request;
+            _changeRequests.Add(created);
+            return Task.FromResult(created);
         }
     }
 }

@@ -1,4 +1,5 @@
 using BookingDesk.Core;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -9,12 +10,29 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Logging.AddConsole(options => options.LogToStandardErrorThreshold = LogLevel.Trace);
 
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddSingleton<IBookingRepository>(services =>
+
+// Where the booking data comes from:
+// - BookingApi:BaseUrl set (env var BookingApi__BaseUrl) -> fetch it from the Booking API over HTTP
+// - not set                                              -> use built-in sample data, so the server runs on its own
+var apiBaseUrl = builder.Configuration["BookingApi:BaseUrl"];
+if (!string.IsNullOrWhiteSpace(apiBaseUrl))
 {
-    var now = services.GetRequiredService<TimeProvider>().GetLocalNow();
-    return InMemoryBookingRepository.CreateWithSampleData(DateOnly.FromDateTime(now.DateTime));
-});
-builder.Services.AddSingleton<BookingService>();
+    builder.Services.AddHttpClient<IBookingRepository, HttpBookingRepository>(client =>
+    {
+        client.BaseAddress = new Uri(apiBaseUrl.TrimEnd('/') + "/");
+        client.Timeout = TimeSpan.FromSeconds(10);
+    });
+}
+else
+{
+    builder.Services.AddSingleton<IBookingRepository>(services =>
+    {
+        var now = services.GetRequiredService<TimeProvider>().GetLocalNow();
+        return InMemoryBookingRepository.CreateWithSampleData(DateOnly.FromDateTime(now.DateTime));
+    });
+}
+
+builder.Services.AddTransient<BookingService>();
 
 builder.Services
     .AddMcpServer()

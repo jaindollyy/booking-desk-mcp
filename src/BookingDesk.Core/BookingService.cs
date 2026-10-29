@@ -14,24 +14,24 @@ public sealed partial class BookingService(IBookingRepository repository, TimePr
 
     private DateOnly Today => DateOnly.FromDateTime(timeProvider.GetLocalNow().DateTime);
 
-    public OperationResult<Booking> GetBooking(string reference)
+    public async Task<OperationResult<Booking>> GetBookingAsync(string reference, CancellationToken cancellationToken = default)
     {
         if (!TryNormaliseReference(reference, out var normalised))
             return OperationResult<Booking>.Fail(InvalidReferenceMessage);
 
-        var booking = repository.FindByReference(normalised);
+        var booking = await repository.FindByReferenceAsync(normalised, cancellationToken);
         return booking is null
             ? OperationResult<Booking>.Fail($"No booking found with reference {normalised}.")
             : OperationResult<Booking>.Ok(booking, $"Found booking {normalised}.");
     }
 
-    public OperationResult<IReadOnlyList<Booking>> FindByLastName(string lastName)
+    public async Task<OperationResult<IReadOnlyList<Booking>>> FindByLastNameAsync(string lastName, CancellationToken cancellationToken = default)
     {
         var name = lastName?.Trim() ?? string.Empty;
         if (name.Length is < 2 or > 50)
             return OperationResult<IReadOnlyList<Booking>>.Fail("Enter a last name between 2 and 50 characters.");
 
-        var bookings = repository.FindByLastName(name);
+        var bookings = await repository.FindByLastNameAsync(name, cancellationToken);
         return bookings.Count == 0
             ? OperationResult<IReadOnlyList<Booking>>.Fail($"No bookings found for the last name {name}.")
             : OperationResult<IReadOnlyList<Booking>>.Ok(bookings, $"Found {bookings.Count} booking(s) for {name}.");
@@ -40,7 +40,8 @@ public sealed partial class BookingService(IBookingRepository repository, TimePr
     /// <summary>
     /// Creates a change request for a person to review. It never edits the booking itself.
     /// </summary>
-    public OperationResult<ChangeRequest> RequestDateChange(string reference, string requestedDate, string? note = null)
+    public async Task<OperationResult<ChangeRequest>> RequestDateChangeAsync(
+        string reference, string requestedDate, string? note = null, CancellationToken cancellationToken = default)
     {
         if (!TryNormaliseReference(reference, out var normalised))
             return OperationResult<ChangeRequest>.Fail(InvalidReferenceMessage);
@@ -48,7 +49,7 @@ public sealed partial class BookingService(IBookingRepository repository, TimePr
         if (!DateOnly.TryParseExact(requestedDate?.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var newDate))
             return OperationResult<ChangeRequest>.Fail("Enter the new date in the format YYYY-MM-DD, for example 2026-12-14.");
 
-        var booking = repository.FindByReference(normalised);
+        var booking = await repository.FindByReferenceAsync(normalised, cancellationToken);
         if (booking is null)
             return OperationResult<ChangeRequest>.Fail($"No booking found with reference {normalised}.");
 
@@ -67,7 +68,8 @@ public sealed partial class BookingService(IBookingRepository repository, TimePr
         if (newDate == booking.TravelDate)
             return OperationResult<ChangeRequest>.Fail($"Booking {normalised} is already on {Format(newDate)}.");
 
-        if (repository.GetChangeRequests(normalised).Any(r => r.Status == ChangeRequestStatus.PendingReview))
+        var existing = await repository.GetChangeRequestsAsync(normalised, cancellationToken);
+        if (existing.Any(r => r.Status == ChangeRequestStatus.PendingReview))
             return OperationResult<ChangeRequest>.Fail(
                 $"Booking {normalised} already has a change request waiting for review.");
 
@@ -75,7 +77,9 @@ public sealed partial class BookingService(IBookingRepository repository, TimePr
         if (cleanNote is { Length: > 500 })
             cleanNote = cleanNote[..500];
 
-        var request = repository.AddChangeRequest(normalised, booking.TravelDate, newDate, cleanNote, timeProvider.GetUtcNow());
+        var request = await repository.AddChangeRequestAsync(
+            new NewChangeRequest(normalised, booking.TravelDate, newDate, cleanNote, timeProvider.GetUtcNow()),
+            cancellationToken);
         return OperationResult<ChangeRequest>.Ok(
             request,
             $"Created change request {request.Id} to move {normalised} from {Format(booking.TravelDate)} to {Format(newDate)}. " +
@@ -86,24 +90,25 @@ public sealed partial class BookingService(IBookingRepository repository, TimePr
     /// Lists change requests. The filter can be a booking reference (QX7P2L), a change request ID (CR-0001),
     /// or empty for all requests.
     /// </summary>
-    public OperationResult<IReadOnlyList<ChangeRequest>> ListChangeRequests(string? filter = null)
+    public async Task<OperationResult<IReadOnlyList<ChangeRequest>>> ListChangeRequestsAsync(
+        string? filter = null, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<ChangeRequest> requests;
         string description;
 
         if (string.IsNullOrWhiteSpace(filter))
         {
-            requests = repository.GetChangeRequests();
+            requests = await repository.GetChangeRequestsAsync(null, cancellationToken);
             description = "in total";
         }
         else if (TryNormaliseRequestId(filter, out var requestId))
         {
-            requests = repository.GetChangeRequests().Where(r => r.Id == requestId).ToList();
+            requests = (await repository.GetChangeRequestsAsync(null, cancellationToken)).Where(r => r.Id == requestId).ToList();
             description = $"with ID {requestId}";
         }
         else if (TryNormaliseReference(filter, out var reference))
         {
-            requests = repository.GetChangeRequests(reference);
+            requests = await repository.GetChangeRequestsAsync(reference, cancellationToken);
             description = $"for booking {reference}";
         }
         else

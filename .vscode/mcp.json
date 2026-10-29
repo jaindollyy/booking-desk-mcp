@@ -3,7 +3,6 @@
     "booking-desk": {
       "type": "stdio",
       "command": "dotnet",
-      "args": ["run", "--project", "src/BookingDesk.McpServer"]
+      "args": ["run", "--project", "src/BookingDesk.McpServer"],
+      "env": { "BookingApi__BaseUrl": "http://localhost:5080" }
     }
-  }
-}
