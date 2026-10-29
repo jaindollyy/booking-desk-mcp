@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BookingDesk.Core/BookingDesk.Core.csproj" />
+    <Project Path="src/BookingDesk.McpServer/BookingDesk.McpServer.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BookingDesk.Tests/BookingDesk.Tests.csproj" />
+  </Folder>
+</Solution>

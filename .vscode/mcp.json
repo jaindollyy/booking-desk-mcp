@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "booking-desk": {
+      "type": "stdio",
+      "command": "dotnet",
+      "args": ["run", "--project", "src/BookingDesk.McpServer"]
+    }
+  }
+}
