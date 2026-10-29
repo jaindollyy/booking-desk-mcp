@@ -41,13 +41,10 @@ public sealed class BookingTools(BookingService bookings)
         => ToJson(bookings.RequestDateChange(reference, newDate, note));
 
     [McpServerTool(Name = "list_change_requests", ReadOnly = true)]
-    [Description("List change requests waiting for review, optionally for one booking reference.")]
+    [Description("List change requests waiting for review. Leave the filter empty for all requests, or filter by a booking reference or a change request ID.")]
     public string ListChangeRequests(
-        [Description("Optional 6-character booking reference to filter by.")] string? reference = null)
-    {
-        var requests = bookings.ListChangeRequests(reference);
-        return JsonSerializer.Serialize(new { count = requests.Count, requests }, JsonOptions);
-    }
+        [Description("Optional filter: a booking reference such as QX7P2L, or a change request ID such as CR-0001.")] string? filter = null)
+        => ToJson(bookings.ListChangeRequests(filter));
 
     private static string ToJson<T>(OperationResult<T> result) =>
         JsonSerializer.Serialize(new { success = result.Success, message = result.Message, data = result.Value }, JsonOptions);

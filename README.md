@@ -17,7 +17,7 @@ All passenger data is fictional sample data.
 | `get_booking` | Looks up a booking by its 6-character reference | No |
 | `find_bookings_by_last_name` | Finds bookings when the customer doesn't know their reference | No |
 | `request_date_change` | Creates a date change request for review | Creates a request only |
-| `list_change_requests` | Lists requests waiting for review | No |
+| `list_change_requests` | Lists requests waiting for review, filtered by booking reference or request ID | No |
 
 Read-only tools are marked as read-only in their MCP metadata, so clients can treat them as safe to call.
 

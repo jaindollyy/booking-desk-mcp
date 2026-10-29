@@ -165,15 +165,45 @@ public class BookingServiceTests
     }
 
     [Fact]
-    public void Change_requests_can_be_listed_for_one_booking_or_all()
+    public void Change_requests_can_be_listed_all_by_booking_or_by_request_id()
     {
         var (service, _) = Create();
         service.RequestDateChange("QX7P2L", Iso(Today.AddDays(25)));
         service.RequestDateChange("HB4K9R", Iso(Today.AddDays(50)));
 
-        Assert.Equal(2, service.ListChangeRequests().Count);
-        Assert.Equal("QX7P2L", Assert.Single(service.ListChangeRequests("qx7p2l")).BookingReference);
-        Assert.Empty(service.ListChangeRequests("not-valid"));
+        var all = service.ListChangeRequests();
+        Assert.True(all.Success);
+        Assert.Equal(2, all.Value!.Count);
+
+        var byBooking = service.ListChangeRequests("qx7p2l");
+        Assert.Equal("QX7P2L", Assert.Single(byBooking.Value!).BookingReference);
+
+        var byId = service.ListChangeRequests("cr-0002");
+        Assert.Equal("HB4K9R", Assert.Single(byId.Value!).BookingReference);
+        Assert.Contains("CR-0002", byId.Message);
+    }
+
+    [Fact]
+    public void An_unrecognised_filter_explains_what_to_enter()
+    {
+        var (service, _) = Create();
+
+        var result = service.ListChangeRequests("not-valid");
+
+        Assert.False(result.Success);
+        Assert.Contains("CR-0001", result.Message);
+    }
+
+    [Fact]
+    public void An_empty_list_says_so()
+    {
+        var (service, _) = Create();
+
+        var result = service.ListChangeRequests();
+
+        Assert.True(result.Success);
+        Assert.Empty(result.Value!);
+        Assert.Equal("No change requests found in total.", result.Message);
     }
 
     [Fact]
